@@ -23,7 +23,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 final class AdvancedHologramManager {
-    private final VahmurHologramsPlugin plugin;
+    private final VHologramsPlugin plugin;
     private final Logger logger;
 
     private final Map<String, GroupDefinition> definitionsById = new LinkedHashMap<>();
@@ -33,7 +33,7 @@ final class AdvancedHologramManager {
     private double defaultLineHeight = 0.24D;
     private boolean warnVisibleAnchor = true;
 
-    AdvancedHologramManager(VahmurHologramsPlugin plugin) {
+    AdvancedHologramManager(VHologramsPlugin plugin) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
     }
@@ -167,18 +167,22 @@ final class AdvancedHologramManager {
 
     private boolean looksVisible(List<String> lines) {
         if (lines == null || lines.isEmpty()) return false;
+
         for (String line : lines) {
             if (line == null) continue;
+
             String trimmed = line.trim();
             if (trimmed.isEmpty()) continue;
             if (trimmed.equalsIgnoreCase("<reset>") || trimmed.equalsIgnoreCase("&r")) continue;
+
             return true;
         }
+
         return false;
     }
 
     private String internalName(String id, int index) {
-        return "__vahmur_adv_" + id + "_" + index;
+        return "__vholo_adv_" + id + "_" + index;
     }
 
     void showForAnchor(String anchor, Player player) {
@@ -199,7 +203,10 @@ final class AdvancedHologramManager {
     void destroyAll() {
         Collection<ActiveGroup> copy = new ArrayList<>(activeByAnchor.values());
         activeByAnchor.clear();
-        for (ActiveGroup group : copy) group.destroy();
+
+        for (ActiveGroup group : copy) {
+            group.destroy();
+        }
     }
 
     int configuredCount() {
@@ -207,9 +214,11 @@ final class AdvancedHologramManager {
     }
 
     int enabledCount() {
-        int n = 0;
-        for (GroupDefinition def : definitionsById.values()) if (def.enabled) n++;
-        return n;
+        int count = 0;
+        for (GroupDefinition def : definitionsById.values()) {
+            if (def.enabled) count++;
+        }
+        return count;
     }
 
     int activeCount() {
