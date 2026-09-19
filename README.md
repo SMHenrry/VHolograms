@@ -1,4 +1,4 @@
-# VahmurHolograms 0.1.0
+# VHolograms 0.1.0
 
 Add-on para FancyHolograms que permite tratar varias líneas con escalas y separaciones distintas como **un solo holograma lógico**.
 
@@ -11,9 +11,24 @@ FancyHolograms mantiene un holograma TEXT normal como `anchor`. Ese holograma co
     - '<reset>'
 ```
 
-VahmurHolograms lee `plugins/VahmurHolograms/config.yml` y crea líneas temporales usando la API de FancyHolograms. Las líneas temporales no son persistentes y no se escriben en `holograms.yml`.
+VHolograms lee `plugins/VHolograms/config.yml` y crea una línea temporal independiente por cada línea configurada usando la API de FancyHolograms. Estas líneas no son persistentes y no se escriben en `holograms.yml`.
 
-Esto permite que el anchor siga moviéndose/editándose con FancyHolograms mientras cada línea visual puede tener una escala distinta.
+Esto permite que el anchor siga moviéndose/editándose con FancyHolograms mientras cada línea visual puede tener una escala, separación y offset distintos.
+
+## Rendimiento
+
+VHolograms no mantiene un loop propio por tick ni un proceso de actualización constante.
+
+El trabajo principal ocurre cuando:
+
+- FancyHolograms termina de cargar.
+- Se ejecuta `/vholo reload` o `/vholo rebuild`.
+- Se crea, actualiza o elimina un anchor configurado.
+- FancyHolograms muestra u oculta el anchor para un jugador.
+
+Cada grupo utiliza un anchor invisible más un holograma temporal por línea. Por ejemplo, un grupo de 7 líneas equivale a 1 anchor + 7 líneas visuales.
+
+Por ello, el coste escala principalmente con la cantidad de líneas visibles y jugadores que las reciben. Para hologramas estáticos con distancias de visibilidad moderadas el impacto adicional del add-on es reducido. Los hologramas con texto actualizado constantemente, una cantidad excesiva de líneas o distancias de visión muy altas naturalmente generan más trabajo para FancyHolograms, red y cliente.
 
 ## Requisitos
 
@@ -24,7 +39,7 @@ Esto permite que el anchor siga moviéndose/editándose con FancyHolograms mient
 
 ## Instalación
 
-1. Coloca `VahmurHolograms-0.1.0.jar` en `plugins/`.
+1. Coloca `VHolograms-0.1.0.jar` en `plugins/`.
 2. Reinicia el servidor.
 3. Crea un holograma TEXT normal en FancyHolograms, por ejemplo `CajaKoth`.
 4. Déjalo con:
@@ -34,7 +49,7 @@ Esto permite que el anchor siga moviéndose/editándose con FancyHolograms mient
     - '<reset>'
 ```
 
-5. Configura el grupo en `plugins/VahmurHolograms/config.yml`.
+5. Configura el grupo en `plugins/VHolograms/config.yml`.
 6. Usa `/vholo reload`.
 
 ## Formato
@@ -79,7 +94,7 @@ La altura automática que consume cada línea es `line_height * scale_y`.
 - `/vholo rebuild`
 - `/vholo rebuild <id>`
 
-Permiso: `vahmurholograms.admin`
+Permiso: `vholograms.admin`
 
 ## Comportamiento
 
