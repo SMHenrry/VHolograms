@@ -1,0 +1,60 @@
+# VahmurHolograms
+#
+# Cada entrada usa UN holograma normal de FancyHolograms como "anchor".
+# El anchor debe ser TEXT y tener una sola línea invisible:
+#
+#     text:
+#     - '<reset>'
+#
+# FancyHolograms sigue controlando la ubicación, visibilidad, billboard,
+# distancia, etc. Este add-on crea las líneas visuales como hologramas
+# temporales no persistentes, por lo que NO aparecen en holograms.yml.
+
+settings:
+  # Altura base consumida por una línea a escala 1.0.
+  default_line_height: 0.24
+
+  # Muestra una advertencia si el anchor parece tener texto visible.
+  warn_visible_anchor: true
+
+holograms:
+  # Ejemplo inspirado en hologramas de cajas / KOTH.
+  # Cambia enabled a true después de crear en FancyHolograms
+  # un holograma TEXT llamado "CajaKoth" con text: ['<reset>'].
+  caja_koth_demo:
+    enabled: false
+    anchor: CajaKoth
+
+    # Desplazamiento vertical de la primera línea respecto al anchor.
+    start_y: 0.55
+
+    # Puede sobrescribir settings.default_line_height para este grupo.
+    line_height: 0.24
+
+    lines:
+      - text: '<gray>◈ — <bold>VAHMUR</bold> — ◈</gray>'
+        scale: 0.80
+        gap_after: 0.03
+
+      - text: '<#FF80B5><bold>ᴄᴀᴊᴀ</bold>'
+        scale: 1.80
+        gap_after: -0.06
+
+      - text: '<#FF80B5><bold>ᴋᴏᴛʜ</bold>'
+        scale: 1.80
+        gap_after: 0.05
+
+      - text: '<gray>Calidad <#FF80B5>★★★★★</#FF80B5></gray>'
+        scale: 1.00
+        gap_after: 0.14
+
+      - text: '<white>¡Usa <#FF80B5>Click-Izq.</#FF80B5> para ver!</white>'
+        scale: 1.00
+        gap_after: 0.01
+
+      - text: '<white>¡Usa <#FF80B5>Click-Der.</#FF80B5> para abrir!</white>'
+        scale: 1.00
+        gap_after: 0.16
+
+      - text: '<#FF80B5>tienda.vahmur.net</#FF80B5>'
+        scale: 0.95
