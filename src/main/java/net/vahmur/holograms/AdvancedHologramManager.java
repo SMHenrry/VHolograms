@@ -18,6 +18,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.joml.Vector3f;
 
 import java.util.HashSet;
@@ -29,6 +30,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class AdvancedHologramManager implements Listener {
+    private static final long JOIN_SYNC_DELAY_TICKS = 10L;
+
     private final VHologramsPlugin plugin;
     private final MetadataStore store;
     private final Map<String, ActiveGroup> active = new ConcurrentHashMap<>();
@@ -80,6 +83,7 @@ final class AdvancedHologramManager implements Listener {
             unmanageAndRestore(hologramName);
             return;
         }
+
         List<String> lines = parentData.getText();
         store.prune(hologramName, lines.size());
         style = store.get(hologramName);
@@ -111,9 +115,8 @@ final class AdvancedHologramManager implements Listener {
         ActiveGroup group = buildGroup(parent, parentData, style, lines);
         active.put(key, group);
 
-        for (UUID uuid : viewers) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) group.show(player);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            reconcile(parent, group, player, false);
         }
     }
 
@@ -171,6 +174,50 @@ final class AdvancedHologramManager implements Listener {
         }
 
         return group;
+    }
+
+    private void syncPlayer(Player player, boolean forceResend) {
+        if (!player.isOnline()) return;
+
+        for (ActiveGroup group : List.copyOf(active.values())) {
+            Hologram parent = fancyManager().getHologram(group.hologramName).orElse(null);
+            if (parent == null) continue;
+
+            reconcile(parent, group, player, forceResend);
+        }
+    }
+
+    private void reconcile(Hologram parent, ActiveGroup group, Player player, boolean forceResend) {
+        boolean shouldSee = parent.meetsVisibilityConditions(player)
+                && parent.isWithinVisibilityDistance(player);
+
+        if (!shouldSee) {
+            group.hide(player);
+
+            if (forceResend && parent.isViewer(player)) {
+                parent.forceHideHologram(player);
+            }
+            return;
+        }
+
+        if (forceResend) {
+            // A login can happen while the client is still receiving its initial
+            // world state. Re-send the displays once after a short delay so a
+            // packet sent too early cannot leave Fancy and the client out of sync.
+            if (parent.isViewer(player)) {
+                parent.forceHideHologram(player);
+            }
+
+            parent.showHologram(player);
+            group.resync(player);
+            return;
+        }
+
+        if (!parent.isViewer(player)) {
+            parent.showHologram(player);
+        }
+
+        group.show(player);
     }
 
     void unmanageAndRestore(String hologramName) {
@@ -262,6 +309,19 @@ final class AdvancedHologramManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onUnloaded(HologramsUnloadedEvent event) {
         Bukkit.getScheduler().runTask(plugin, () -> destroyAll(false));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onJoin(PlayerJoinEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+
+        // One-shot reconciliation only. There is no repeating VHolograms task.
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                syncPlayer(player, true);
+            }
+        }, JOIN_SYNC_DELAY_TICKS);
     }
 
     private String internalName(String hologramName, int line) {
