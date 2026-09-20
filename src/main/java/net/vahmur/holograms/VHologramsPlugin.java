@@ -6,17 +6,12 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-
 public final class VHologramsPlugin extends JavaPlugin {
     private MetadataStore store;
     private AdvancedHologramManager manager;
 
     @Override
     public void onEnable() {
-        migrateLegacyDataFolder();
         saveDefaultConfig();
 
         if (!FancyHologramsPlugin.isEnabled()) {
@@ -38,30 +33,13 @@ public final class VHologramsPlugin extends JavaPlugin {
             Bukkit.getScheduler().runTask(this, manager::rebuildAll);
         }
 
-        getLogger().info("VHolograms 0.2.0 habilitado.");
+        getLogger().info("VHolograms " + getPluginMeta().getVersion() + " habilitado.");
     }
 
     @Override
     public void onDisable() {
         if (manager != null && FancyHologramsPlugin.isEnabled()) {
             manager.destroyAll(true);
-        }
-    }
-
-    private void migrateLegacyDataFolder() {
-        File newFolder = getDataFolder();
-        File pluginsFolder = newFolder.getParentFile();
-
-        if (newFolder.exists() || pluginsFolder == null) return;
-
-        File legacyFolder = new File(pluginsFolder, "VahmurHolograms");
-        if (!legacyFolder.isDirectory()) return;
-
-        try {
-            Files.move(legacyFolder.toPath(), newFolder.toPath());
-            getLogger().info("Configuración migrada de VahmurHolograms a VHolograms.");
-        } catch (IOException exception) {
-            getLogger().warning("No se pudo migrar automáticamente la carpeta VahmurHolograms: " + exception.getMessage());
         }
     }
 
