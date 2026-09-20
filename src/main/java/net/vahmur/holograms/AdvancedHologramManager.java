@@ -80,8 +80,6 @@ final class AdvancedHologramManager implements Listener {
             unmanageAndRestore(hologramName);
             return;
         }
-
-        store.restoreLegacyTextIfNeeded(parent);
         List<String> lines = parentData.getText();
         store.prune(hologramName, lines.size());
         style = store.get(hologramName);
