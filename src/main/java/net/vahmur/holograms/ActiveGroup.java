@@ -23,6 +23,16 @@ final class ActiveGroup {
         }
     }
 
+    void resync(Player player) {
+        for (Hologram child : children) {
+            if (child.isViewer(player)) {
+                child.forceHideHologram(player);
+            }
+
+            child.forceShowHologram(player);
+        }
+    }
+
     void hide(Player player) {
         for (Hologram child : children) {
             if (child.isViewer(player)) {
