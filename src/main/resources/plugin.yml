@@ -1,9 +1,8 @@
 name: VHolograms
-version: 0.1.0
+version: 0.2.0
 main: net.vahmur.holograms.VHologramsPlugin
 api-version: '1.21'
 author: Vahmur
-website: https://fancyinnovations.com/docs/minecraft-plugins/fancyholograms
 
 depend:
   - FancyHolograms
@@ -12,8 +11,8 @@ softdepend:
 
 commands:
   vholo:
-    description: Administra los hologramas avanzados de Vahmur.
-    usage: /vholo <reload|status|rebuild>
+    description: Administra las extensiones por línea de VHolograms.
+    usage: /vholo <reload|status|rebuild|clear>
     aliases: [vholograms]
     permission: vholograms.admin
 

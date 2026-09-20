@@ -1,104 +1,328 @@
-# VHolograms 0.1.0
+# VHolograms
 
-Add-on para FancyHolograms que permite tratar varias líneas con escalas y separaciones distintas como **un solo holograma lógico**.
+**VHolograms** es un add-on para [FancyHolograms](https://github.com/FancyInnovations/FancyPlugins) que permite dar propiedades independientes a cada línea de un holograma de texto sin abandonar el flujo normal de FancyHolograms.
 
-## Idea
+La idea principal es simple:
 
-FancyHolograms mantiene un holograma TEXT normal como `anchor`. Ese holograma conserva ubicación, yaw/pitch, billboard, visibilidad, distancia, sombra, fondo, etc. Su texto debe ser invisible:
-
-```yaml
-    text:
-    - '<reset>'
-```
-
-VHolograms lee `plugins/VHolograms/config.yml` y crea una línea temporal independiente por cada línea configurada usando la API de FancyHolograms. Estas líneas no son persistentes y no se escriben en `holograms.yml`.
-
-Esto permite que el anchor siga moviéndose/editándose con FancyHolograms mientras cada línea visual puede tener una escala, separación y offset distintos.
-
-## Rendimiento
-
-VHolograms no mantiene un loop propio por tick ni un proceso de actualización constante.
-
-El trabajo principal ocurre cuando:
-
-- FancyHolograms termina de cargar.
-- Se ejecuta `/vholo reload` o `/vholo rebuild`.
-- Se crea, actualiza o elimina un anchor configurado.
-- FancyHolograms muestra u oculta el anchor para un jugador.
-
-Cada grupo utiliza un anchor invisible más un holograma temporal por línea. Por ejemplo, un grupo de 7 líneas equivale a 1 anchor + 7 líneas visuales.
-
-Por ello, el coste escala principalmente con la cantidad de líneas visibles y jugadores que las reciben. Para hologramas estáticos con distancias de visibilidad moderadas el impacto adicional del add-on es reducido. Los hologramas con texto actualizado constantemente, una cantidad excesiva de líneas o distancias de visión muy altas naturalmente generan más trabajo para FancyHolograms, red y cliente.
+- **FancyHolograms sigue siendo la fuente de verdad.**
+- El texto y las propiedades generales continúan guardándose en FancyHolograms.
+- VHolograms solo guarda la metadata adicional que Fancy no puede aplicar de forma independiente a cada línea.
+- No es necesario editar `holograms.yml` ni reemplazar el texto por `<reset>`.
 
 ## Requisitos
 
-- Paper 1.21.4+
 - Java 21+
-- FancyHolograms 2.10.0-java21 / 2.10.x o una versión posterior compatible con la misma API
-- Nexo es opcional. Los `<glyph:...>` pueden permanecer dentro del texto porque las líneas se renderizan mediante FancyHolograms.
+- Paper 1.21.4+
+- FancyHolograms 2.10.x compatible
+- Nexo es opcional
+
+Los glyphs de Nexo pueden seguir utilizándose normalmente dentro del texto de FancyHolograms.
 
 ## Instalación
 
-1. Coloca `VHolograms-0.1.0.jar` en `plugins/`.
-2. Reinicia el servidor.
-3. Crea un holograma TEXT normal en FancyHolograms, por ejemplo `CajaKoth`.
-4. Déjalo con:
+1. Instala FancyHolograms.
+2. Coloca `VHolograms-0.2.0.jar` dentro de `plugins/`.
+3. Reinicia el servidor.
+4. Crea y edita tus hologramas con FancyHolograms como siempre.
 
-```yaml
-    text:
-    - '<reset>'
+VHolograms genera:
+
+```text
+plugins/VHolograms/
+├── config.yml
+└── data.yml
 ```
 
-5. Configura el grupo en `plugins/VHolograms/config.yml`.
-6. Usa `/vholo reload`.
+No necesitas editar `data.yml` manualmente durante el uso normal.
 
-## Formato
+## Uso rápido
+
+Crea un holograma de texto de Fancy:
+
+```text
+/fholo create text ejemplo
+```
+
+FancyHolograms crea su línea inicial habitual. Puedes sustituirla normalmente:
+
+```text
+/fholo edit ejemplo setline 1 &6Mi texto
+```
+
+Hasta este punto el holograma sigue siendo 100 % FancyHolograms.
+
+Para activar una propiedad independiente en esa línea, añade una opción de VHolograms al final:
+
+```text
+/fholo edit ejemplo setline 1 &6Mi texto --scale 1.5
+```
+
+Fancy conserva el texto:
+
+```yaml
+text:
+- '&6Mi texto'
+```
+
+Mientras VHolograms conserva únicamente la metadata adicional:
 
 ```yaml
 holograms:
-  caja_koth:
-    enabled: true
-    anchor: CajaKoth
-    start_y: 0.55
-    line_height: 0.24
+  ejemplo:
     lines:
-      - text: '<gray>◈ — <bold>VAHMUR</bold> — ◈</gray>'
-        scale: 0.80
-        gap_after: 0.03
-
-      - text: '<#FF80B5><bold>ᴄᴀᴊᴀ</bold>'
-        scale: 1.80
-        gap_after: -0.06
-
-      - text: '<glyph:essential_icons_dialogue>'
-        scale: 1.00
+      1:
+        scale: 1.5
 ```
 
-### Propiedades por línea
+## Opciones por línea
 
-- `text`: MiniMessage/FancyHolograms/Nexo glyphs.
-- `scale`: escala uniforme.
-- `scale_x`, `scale_y`, `scale_z`: sobrescriben `scale` por eje.
-- `offset_x`, `offset_y`, `offset_z`: ajuste fino de posición.
-- `gap_before`: espacio adicional antes de la línea.
-- `gap_after`: espacio adicional después de la línea; admite negativos.
-- `text_shadow`: `true/false`, opcional; si falta hereda del anchor.
-- `see_through`: `true/false`, opcional; si falta hereda del anchor.
+| Opción | Uso |
+| --- | --- |
+| `--scale` | Escala uniforme de la línea |
+| `--scale-x` | Escala horizontal |
+| `--scale-y` | Escala vertical |
+| `--scale-z` | Escala en profundidad |
+| `--offset-x` | Desplaza únicamente esa línea en X |
+| `--offset-y` | Desplaza únicamente esa línea en Y |
+| `--offset-z` | Desplaza únicamente esa línea en Z |
+| `--gap-before` | Añade espacio antes de la línea y desplaza las siguientes |
+| `--gap-after` | Añade espacio después de la línea y desplaza las siguientes |
+| `--text-shadow` | Sobrescribe el text shadow para esa línea |
+| `--see-through` | Sobrescribe see-through para esa línea |
 
-La altura automática que consume cada línea es `line_height * scale_y`.
+Las opciones pueden combinarse:
 
-## Comandos
+```text
+/fholo edit ejemplo setline 1 &6Mi texto --scale 1.5 --offset-y 0.10 --gap-after 0.05
+```
 
-- `/vholo reload`
-- `/vholo status`
-- `/vholo rebuild`
-- `/vholo rebuild <id>`
+VHolograms añade sugerencias al autocompletado para estas opciones y sus valores.
 
-Permiso: `vholograms.admin`
+## Herencia desde FancyHolograms
 
-## Comportamiento
+Las propiedades generales siguen perteneciendo a FancyHolograms.
 
-- Al mover/modificar el anchor desde FancyHolograms, el grupo se reconstruye automáticamente.
-- Al ocultarse/mostrarse el anchor para un jugador, las líneas siguen la misma visibilidad.
-- Al recargar FancyHolograms, las líneas se destruyen y reconstruyen.
-- El anchor debe seguir siendo TEXT.
+Por ejemplo:
+
+```text
+/fholo edit ejemplo textshadow true
+```
+
+hará que todas las líneas hereden `text_shadow: true`.
+
+Puedes crear una excepción:
+
+```text
+/fholo edit ejemplo setline 2 &7Segunda línea --text-shadow false
+```
+
+Ahora la línea 2 usa `false`, mientras las demás continúan heredando el valor de Fancy.
+
+Para quitar el override:
+
+```text
+/fholo edit ejemplo setline 2 &7Segunda línea --text-shadow inherit
+```
+
+También se aceptan `default` y `reset` como equivalentes de `inherit`.
+
+## Diferencia entre offset y gap
+
+`offset-y` mueve **solamente la línea seleccionada**:
+
+```text
+Línea 1
+        Línea 2  <- offset
+Línea 3
+```
+
+`gap-before` y `gap-after` modifican el flujo vertical, por lo que también desplazan las líneas posteriores:
+
+```text
+Línea 1
+
+        <- gap extra
+
+Línea 2
+Línea 3
+```
+
+Esto hace que `gap` sea útil para separar secciones y que `offset-y` sea mejor para ajustes visuales finos.
+
+Los gaps pueden ser negativos.
+
+## Añadir líneas
+
+FancyHolograms continúa administrando las líneas:
+
+```text
+/fholo edit ejemplo addline &7Segunda línea
+```
+
+También puedes crear la línea con propiedades avanzadas directamente:
+
+```text
+/fholo edit ejemplo addline &7Segunda línea --scale 0.9 --offset-y -0.03
+```
+
+## Insertar y eliminar líneas
+
+VHolograms sigue los comandos nativos de FancyHolograms:
+
+```text
+/fholo edit ejemplo insertbefore 2 &aNueva línea
+/fholo edit ejemplo insertafter 2 &bOtra línea
+/fholo edit ejemplo removeline 2
+```
+
+Si el holograma ya tiene metadata avanzada, VHolograms reajusta automáticamente los números de línea para mantener cada estilo unido al contenido correcto.
+
+Las líneas insertadas también pueden recibir opciones inmediatamente:
+
+```text
+/fholo edit ejemplo insertbefore 2 &aNueva línea --scale 1.25 --gap-after 0.10
+```
+
+## Propiedades generales de Fancy
+
+Puedes seguir utilizando normalmente las opciones de FancyHolograms:
+
+```text
+/fholo edit ejemplo background transparent
+/fholo edit ejemplo textshadow true
+/fholo edit ejemplo seethrough false
+/fholo edit ejemplo visibilitydistance 24
+/fholo edit ejemplo translate 0 -0.15 0
+/fholo edit ejemplo scale 1 1 1
+```
+
+VHolograms hereda estas propiedades y solo las sobrescribe donde exista una excepción por línea.
+
+## Nexo / glyphs
+
+El texto permanece almacenado en FancyHolograms, así que los glyphs pueden utilizarse igual que antes:
+
+```text
+/fholo edit ejemplo setline 1 <glyph:essential_icons_dialogue> --scale 0.85
+```
+
+VHolograms no reemplaza ni interpreta el glyph: conserva el texto y deja que el sistema utilizado por FancyHolograms lo renderice.
+
+## Comandos de VHolograms
+
+```text
+/vholo status
+/vholo reload
+/vholo rebuild
+/vholo rebuild <holograma>
+/vholo clear <holograma>
+/vholo clear <holograma> <línea>
+```
+
+Permiso:
+
+```text
+vholograms.admin
+```
+
+### `/vholo clear`
+
+Elimina metadata avanzada sin borrar el texto de FancyHolograms.
+
+Para una sola línea:
+
+```text
+/vholo clear ejemplo 2
+```
+
+Para todo el holograma:
+
+```text
+/vholo clear ejemplo
+```
+
+Si ya no queda ninguna propiedad avanzada, VHolograms deja de componer el holograma y FancyHolograms vuelve a renderizar su TextDisplay original.
+
+## Cómo funciona internamente
+
+Un holograma normal de FancyHolograms utiliza un único TextDisplay para todas sus líneas. Minecraft aplica transformaciones como la escala al display completo, no a cada línea individual.
+
+Cuando un holograma recibe metadata de VHolograms:
+
+1. FancyHolograms mantiene intactos el texto y los datos originales.
+2. VHolograms evita que el TextDisplay original se muestre al jugador.
+3. Crea un TextDisplay temporal por cada línea.
+4. Cada línea hereda las propiedades generales del holograma original.
+5. VHolograms aplica sus overrides individuales.
+6. Los displays temporales siguen la visibilidad del holograma original.
+
+Estos displays son **temporales y no persistentes**, por lo que no se escriben en `holograms.yml`.
+
+## Rendimiento
+
+VHolograms no añade un loop propio por tick.
+
+El trabajo adicional ocurre principalmente cuando:
+
+- se activa o desactiva un holograma avanzado;
+- FancyHolograms actualiza el holograma;
+- se cambia el texto;
+- se muestra u oculta para un jugador;
+- se ejecuta un rebuild/reload.
+
+El coste visual aumenta con la cantidad de líneas avanzadas visibles porque cada línea necesita su propio TextDisplay. Para hologramas estáticos y distancias de visibilidad razonables, el comportamiento está pensado para mantenerse ligero.
+
+## Compatibilidad con TEXT, ITEM y BLOCK
+
+FancyHolograms maneja `TEXT`, `ITEM` y `BLOCK` como tipos de holograma distintos.
+
+La versión 0.2.0 de VHolograms extiende únicamente hologramas `TEXT`. No mezcla `ITEM` o `BLOCK` dentro del mismo holograma lógico.
+
+## Migración desde 0.1.0
+
+VHolograms 0.1.0 requería utilizar un anchor con:
+
+```yaml
+text:
+- '<reset>'
+```
+
+y almacenaba el texto dentro de su propia configuración.
+
+La 0.2.0 migra automáticamente ese formato:
+
+- detecta la configuración anterior;
+- restaura el texto dentro de FancyHolograms cuando el anchor estaba vacío;
+- conserva la metadata de escala, offsets, gaps y overrides;
+- mueve la carpeta antigua `plugins/VahmurHolograms/` a `plugins/VHolograms/` cuando corresponde.
+
+Una vez migrado, el texto vuelve a pertenecer a FancyHolograms.
+
+## Ejemplo completo
+
+```text
+/fholo create text caja
+
+/fholo edit caja setline 1 <#FF80B5><bold>ᴄᴀᴊᴀ</bold> --scale 1.8 --gap-after 0.04
+/fholo edit caja addline <#FF80B5><bold>ᴋᴏᴛʜ</bold> --scale 1.8 --gap-after 0.08
+/fholo edit caja addline <gray>Calidad <#FF80B5>★★★★★</#FF80B5></gray> --gap-after 0.12
+/fholo edit caja addline <white>ᴄʟɪᴄᴋ ᴘᴀʀᴀ ᴀʙʀɪʀ</white>
+
+/fholo edit caja background transparent
+/fholo edit caja textshadow true
+/fholo edit caja visibilitydistance 24
+```
+
+El resultado sigue siendo administrable desde FancyHolograms, pero cada línea puede tener su propia escala y separación gracias a VHolograms.
+
+## Versionado y desarrollo
+
+La rama `main` representa las versiones estables.
+
+Antes de cambios grandes se conservan puntos de restauración en ramas estables. La versión previa a esta arquitectura permanece disponible en:
+
+```text
+stable/v0.1.0-before-native-workflow
+```
+
+Las nuevas implementaciones se desarrollan y prueban en ramas separadas antes de fusionarse a `main`.

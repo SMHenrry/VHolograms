@@ -3,130 +3,140 @@ package net.vahmur.holograms;
 import de.oliver.fancyholograms.api.FancyHologramsPlugin;
 import de.oliver.fancyholograms.api.HologramManager;
 import de.oliver.fancyholograms.api.data.TextHologramData;
+import de.oliver.fancyholograms.api.data.property.Visibility;
+import de.oliver.fancyholograms.api.events.HologramCreateEvent;
+import de.oliver.fancyholograms.api.events.HologramDeleteEvent;
+import de.oliver.fancyholograms.api.events.HologramHideEvent;
+import de.oliver.fancyholograms.api.events.HologramShowEvent;
+import de.oliver.fancyholograms.api.events.HologramUpdateEvent;
+import de.oliver.fancyholograms.api.events.HologramsLoadedEvent;
+import de.oliver.fancyholograms.api.events.HologramsUnloadedEvent;
 import de.oliver.fancyholograms.api.hologram.Hologram;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.joml.Vector3f;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Logger;
+import java.util.concurrent.ConcurrentHashMap;
 
-final class AdvancedHologramManager {
+final class AdvancedHologramManager implements Listener {
     private final VHologramsPlugin plugin;
-    private final Logger logger;
+    private final MetadataStore store;
+    private final Map<String, ActiveGroup> active = new ConcurrentHashMap<>();
+    private final Set<String> pendingRebuilds = ConcurrentHashMap.newKeySet();
+    private final Set<String> restoringParents = ConcurrentHashMap.newKeySet();
 
-    private final Map<String, GroupDefinition> definitionsById = new LinkedHashMap<>();
-    private final Map<String, GroupDefinition> definitionsByAnchor = new HashMap<>();
-    private final Map<String, ActiveGroup> activeByAnchor = new HashMap<>();
-
-    private double defaultLineHeight = 0.24D;
-    private boolean warnVisibleAnchor = true;
-
-    AdvancedHologramManager(VHologramsPlugin plugin) {
+    AdvancedHologramManager(VHologramsPlugin plugin, MetadataStore store) {
         this.plugin = plugin;
-        this.logger = plugin.getLogger();
-    }
-
-    void loadDefinitions() {
-        definitionsById.clear();
-        definitionsByAnchor.clear();
-
-        defaultLineHeight = plugin.getConfig().getDouble("settings.default_line_height", 0.24D);
-        warnVisibleAnchor = plugin.getConfig().getBoolean("settings.warn_visible_anchor", true);
-
-        ConfigurationSection root = plugin.getConfig().getConfigurationSection("holograms");
-        if (root == null) return;
-
-        for (String id : root.getKeys(false)) {
-            ConfigurationSection section = root.getConfigurationSection(id);
-            if (section == null) continue;
-
-            GroupDefinition def = GroupDefinition.read(id, section, defaultLineHeight);
-            definitionsById.put(id, def);
-            if (def.enabled) {
-                definitionsByAnchor.put(def.anchor, def);
-            }
-        }
+        this.store = store;
     }
 
     void rebuildAll() {
-        Set<String> oldAnchors = new HashSet<>(activeByAnchor.keySet());
-        for (String anchor : oldAnchors) {
-            destroyAnchor(anchor);
+        for (String name : Set.copyOf(active.keySet())) {
+            destroyGroup(name);
         }
 
-        HologramManager fancy = fancyManager();
-        if (!fancy.isLoaded()) {
-            logger.warning("FancyHolograms todavía no terminó de cargar; se reintentará cuando dispare HologramsLoadedEvent.");
-            return;
-        }
+        if (!fancyManager().isLoaded()) return;
 
-        for (GroupDefinition def : definitionsById.values()) {
-            if (def.enabled) rebuildDefinition(def);
+        for (HologramStyle style : store.all()) {
+            rebuild(style.hologramName());
         }
     }
 
-    void rebuildAnchor(String anchorName) {
-        GroupDefinition def = definitionsByAnchor.get(anchorName);
-        destroyAnchor(anchorName);
-        if (def != null && def.enabled) {
-            rebuildDefinition(def);
-        }
+    void scheduleRebuild(String hologramName) {
+        String key = key(hologramName);
+        if (!pendingRebuilds.add(key)) return;
+
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            pendingRebuilds.remove(key);
+            rebuild(hologramName);
+        });
     }
 
-    private void rebuildDefinition(GroupDefinition def) {
-        Optional<Hologram> parentOpt = fancyManager().getHologram(def.anchor);
-        if (parentOpt.isEmpty()) {
-            logger.warning("No existe el anchor de FancyHolograms '" + def.anchor + "' para el grupo '" + def.id + "'.");
+    void rebuild(String hologramName) {
+        HologramStyle style = store.get(hologramName);
+        if (style == null || !style.isManaged()) {
+            unmanageAndRestore(hologramName);
             return;
         }
 
-        Hologram parent = parentOpt.get();
+        Hologram parent = fancyManager().getHologram(hologramName).orElse(null);
+        if (parent == null) {
+            destroyGroup(hologramName);
+            return;
+        }
+
         if (!(parent.getData() instanceof TextHologramData parentData)) {
-            logger.warning("El anchor '" + def.anchor + "' debe ser un holograma TEXT.");
+            plugin.getLogger().warning("VHolograms solo puede aplicar estilos por línea a hologramas TEXT: " + hologramName);
+            unmanageAndRestore(hologramName);
             return;
         }
 
-        if (def.lines.isEmpty()) {
-            logger.warning("El grupo '" + def.id + "' no contiene líneas.");
+        store.restoreLegacyTextIfNeeded(parent);
+        List<String> lines = parentData.getText();
+        store.prune(hologramName, lines.size());
+        style = store.get(hologramName);
+        if (style == null || !style.isManaged()) {
+            unmanageAndRestore(hologramName);
             return;
         }
 
-        if (warnVisibleAnchor && looksVisible(parentData.getText())) {
-            logger.warning("El anchor '" + def.anchor + "' tiene texto visible. Usa text: ['<reset>'] para evitar duplicados.");
+        String key = key(hologramName);
+        ActiveGroup previous = active.remove(key);
+        Set<UUID> viewers = new HashSet<>(parent.getViewers());
+        boolean firstAdoption = previous == null;
+
+        if (previous != null) {
+            previous.destroy(fancyManager());
         }
 
-        Set<UUID> currentViewers = new HashSet<>(parent.getViewers());
-        ActiveGroup group = new ActiveGroup(def);
+        if (firstAdoption) {
+            // The parent is currently visible. Despawn it once, then keep its viewer
+            // bookkeeping so FancyHolograms can continue driving visibility normally.
+            for (UUID uuid : viewers) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player == null) continue;
+                parent.forceHideHologram(player);
+                parent.showHologram(player);
+            }
+        }
 
+        ActiveGroup group = buildGroup(parent, parentData, style, lines);
+        active.put(key, group);
+
+        for (UUID uuid : viewers) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) group.show(player);
+        }
+    }
+
+    private ActiveGroup buildGroup(Hologram parent, TextHologramData parentData, HologramStyle style, List<String> lines) {
+        ActiveGroup group = new ActiveGroup(parent.getName());
         Vector3f parentScale = parentData.getScale();
         Vector3f parentTranslation = parentData.getTranslation();
-
+        double lineHeight = style.lineHeight(plugin.getConfig().getDouble("settings.default_line_height", 0.24D));
         double cursor = 0.0D;
-        int index = 0;
 
-        for (LineSpec line : def.lines) {
-            cursor += line.gapBefore;
+        for (int index = 0; index < lines.size(); index++) {
+            int lineNumber = index + 1;
+            LineStyle lineStyle = style.line(lineNumber);
+            if (lineStyle == null) lineStyle = new LineStyle();
 
-            Location lineLocation = parentData.getLocation().clone();
-            float translateX = parentTranslation.x() + line.offsetX;
-            float translateY = parentTranslation.y() + (float) (def.startY - cursor) + line.offsetY;
-            float translateZ = parentTranslation.z() + line.offsetZ;
+            cursor += lineStyle.gapBefore();
 
-            TextHologramData childData = new TextHologramData(internalName(def.id, index), lineLocation);
+            Location location = parentData.getLocation().clone();
+            TextHologramData childData = new TextHologramData(internalName(parent.getName(), lineNumber), location);
             childData.setPersistent(false);
-            childData.setVisibility(parentData.getVisibility());
+            childData.setVisibility(Visibility.MANUAL);
             childData.setVisibilityDistance(parentData.getVisibilityDistance());
 
             childData.setBillboard(parentData.getBillboard());
@@ -136,105 +146,137 @@ final class AdvancedHologramManager {
             childData.setInterpolationDuration(parentData.getInterpolationDuration());
 
             childData.setScale(new Vector3f(
-                    parentScale.x() * line.scaleX,
-                    parentScale.y() * line.scaleY,
-                    parentScale.z() * line.scaleZ
+                    parentScale.x() * lineStyle.scaleX(),
+                    parentScale.y() * lineStyle.scaleY(),
+                    parentScale.z() * lineStyle.scaleZ()
             ));
-            childData.setTranslation(new Vector3f(translateX, translateY, translateZ));
 
-            childData.setText(List.of(line.text));
+            childData.setTranslation(new Vector3f(
+                    parentTranslation.x() + lineStyle.offsetX(),
+                    parentTranslation.y() + (float) (style.startY() - cursor) + lineStyle.offsetY(),
+                    parentTranslation.z() + lineStyle.offsetZ()
+            ));
+
+            childData.setText(List.of(lines.get(index)));
             childData.setTextAlignment(parentData.getTextAlignment());
             childData.setBackground(parentData.getBackground());
-            childData.setTextShadow(line.textShadow != null ? line.textShadow : parentData.hasTextShadow());
-            childData.setSeeThrough(line.seeThrough != null ? line.seeThrough : parentData.isSeeThrough());
+            childData.setTextShadow(lineStyle.textShadow() != null ? lineStyle.textShadow() : parentData.hasTextShadow());
+            childData.setSeeThrough(lineStyle.seeThrough() != null ? lineStyle.seeThrough() : parentData.isSeeThrough());
             childData.setTextUpdateInterval(parentData.getTextUpdateInterval());
 
             Hologram child = fancyManager().create(childData);
+            fancyManager().addHologram(child);
             group.children.add(child);
 
-            cursor += def.lineHeight * Math.max(0.05D, line.scaleY);
-            cursor += line.gapAfter;
-            index++;
+            cursor += lineHeight * Math.max(0.05D, lineStyle.scaleY());
+            cursor += lineStyle.gapAfter();
         }
 
-        activeByAnchor.put(def.anchor, group);
-
-        for (UUID viewerId : currentViewers) {
-            Player player = Bukkit.getPlayer(viewerId);
-            if (player != null) group.show(player);
-        }
+        return group;
     }
 
-    private boolean looksVisible(List<String> lines) {
-        if (lines == null || lines.isEmpty()) return false;
+    void unmanageAndRestore(String hologramName) {
+        String key = key(hologramName);
+        ActiveGroup group = active.remove(key);
+        if (group == null) return;
 
-        for (String line : lines) {
-            if (line == null) continue;
+        Hologram parent = fancyManager().getHologram(hologramName).orElse(null);
+        Set<UUID> viewers = parent == null ? Set.of() : new HashSet<>(parent.getViewers());
+        group.destroy(fancyManager());
 
-            String trimmed = line.trim();
-            if (trimmed.isEmpty()) continue;
-            if (trimmed.equalsIgnoreCase("<reset>") || trimmed.equalsIgnoreCase("&r")) continue;
+        if (parent == null || viewers.isEmpty()) return;
 
-            return true;
-        }
-
-        return false;
-    }
-
-    private String internalName(String id, int index) {
-        return "__vholo_adv_" + id + "_" + index;
-    }
-
-    void showForAnchor(String anchor, Player player) {
-        ActiveGroup group = activeByAnchor.get(anchor);
-        if (group != null) group.show(player);
-    }
-
-    void hideForAnchor(String anchor, Player player) {
-        ActiveGroup group = activeByAnchor.get(anchor);
-        if (group != null) group.hide(player);
-    }
-
-    void destroyAnchor(String anchor) {
-        ActiveGroup group = activeByAnchor.remove(anchor);
-        if (group != null) group.destroy();
-    }
-
-    void destroyAll() {
-        Collection<ActiveGroup> copy = new ArrayList<>(activeByAnchor.values());
-        activeByAnchor.clear();
-
-        for (ActiveGroup group : copy) {
-            group.destroy();
+        restoringParents.add(key);
+        try {
+            for (UUID uuid : viewers) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null) parent.forceShowHologram(player);
+            }
+        } finally {
+            restoringParents.remove(key);
         }
     }
 
-    int configuredCount() {
-        return definitionsById.size();
+    void destroyGroup(String hologramName) {
+        ActiveGroup group = active.remove(key(hologramName));
+        if (group != null) group.destroy(fancyManager());
     }
 
-    int enabledCount() {
-        int count = 0;
-        for (GroupDefinition def : definitionsById.values()) {
-            if (def.enabled) count++;
+    void destroyAll(boolean restoreParents) {
+        for (String name : Set.copyOf(active.keySet())) {
+            if (restoreParents) unmanageAndRestore(name);
+            else destroyGroup(name);
         }
-        return count;
     }
 
     int activeCount() {
-        return activeByAnchor.size();
+        return active.size();
     }
 
-    boolean isConfiguredAnchor(String anchor) {
-        return definitionsByAnchor.containsKey(anchor);
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onShow(HologramShowEvent event) {
+        String name = event.getHologram().getName();
+        String key = key(name);
+        if (restoringParents.contains(key)) return;
+
+        ActiveGroup group = active.get(key);
+        if (group == null || !store.isManaged(name)) return;
+
+        // Suppress only the original multi-line TextDisplay. The text remains intact
+        // inside FancyHolograms and is still the source of truth.
+        event.setCancelled(true);
+        event.getHologram().showHologram(event.getPlayer());
+        group.show(event.getPlayer());
     }
 
-    String anchorForId(String id) {
-        GroupDefinition def = definitionsById.get(id);
-        return def == null ? null : def.anchor;
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHide(HologramHideEvent event) {
+        ActiveGroup group = active.get(key(event.getHologram().getName()));
+        if (group != null) group.hide(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onUpdate(HologramUpdateEvent event) {
+        String name = event.getHologram().getName();
+        if (store.isManaged(name)) scheduleRebuild(name);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onCreate(HologramCreateEvent event) {
+        String name = event.getHologram().getName();
+        if (store.isManaged(name)) scheduleRebuild(name);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDelete(HologramDeleteEvent event) {
+        String name = event.getHologram().getName();
+        if (active.containsKey(key(name)) || store.isManaged(name)) {
+            destroyGroup(name);
+            store.removeHologram(name);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onLoaded(HologramsLoadedEvent event) {
+        Bukkit.getScheduler().runTask(plugin, this::rebuildAll);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onUnloaded(HologramsUnloadedEvent event) {
+        Bukkit.getScheduler().runTask(plugin, () -> destroyAll(false));
+    }
+
+    private String internalName(String hologramName, int line) {
+        String safe = hologramName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
+        if (safe.length() > 32) safe = safe.substring(0, 32);
+        return "__vholo_" + safe + "_" + Integer.toHexString(hologramName.toLowerCase(Locale.ROOT).hashCode()) + "_" + line;
     }
 
     private HologramManager fancyManager() {
         return FancyHologramsPlugin.get().getHologramManager();
+    }
+
+    private static String key(String name) {
+        return name.toLowerCase(Locale.ROOT);
     }
 }
