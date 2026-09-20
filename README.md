@@ -269,7 +269,10 @@ El trabajo adicional ocurre principalmente cuando:
 - FancyHolograms actualiza el holograma;
 - se cambia el texto;
 - se muestra u oculta para un jugador;
-- se ejecuta un rebuild/reload.
+- se ejecuta un rebuild/reload;
+- un jugador entra al servidor.
+
+Al entrar un jugador, VHolograms realiza **una única sincronización 10 ticks después** para asegurar que los TextDisplays cercanos hayan sido enviados correctamente una vez que el cliente terminó su estado inicial de conexión. No es una tarea repetitiva ni un ciclo periódico.
 
 El coste visual aumenta con la cantidad de líneas avanzadas visibles porque cada línea necesita su propio TextDisplay. Para hologramas estáticos y distancias de visibilidad razonables, el comportamiento está pensado para mantenerse ligero.
 
