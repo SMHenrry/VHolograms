@@ -1,26 +1,17 @@
 package net.vahmur.holograms;
 
 import de.oliver.fancyholograms.api.FancyHologramsPlugin;
-import de.oliver.fancyholograms.api.events.HologramCreateEvent;
-import de.oliver.fancyholograms.api.events.HologramDeleteEvent;
-import de.oliver.fancyholograms.api.events.HologramHideEvent;
-import de.oliver.fancyholograms.api.events.HologramShowEvent;
-import de.oliver.fancyholograms.api.events.HologramUpdateEvent;
-import de.oliver.fancyholograms.api.events.HologramsLoadedEvent;
-import de.oliver.fancyholograms.api.events.HologramsUnloadedEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 
-public final class VHologramsPlugin extends JavaPlugin implements Listener {
+public final class VHologramsPlugin extends JavaPlugin {
+    private MetadataStore store;
     private AdvancedHologramManager manager;
 
     @Override
@@ -28,97 +19,49 @@ public final class VHologramsPlugin extends JavaPlugin implements Listener {
         migrateLegacyDataFolder();
         saveDefaultConfig();
 
-        manager = new AdvancedHologramManager(this);
-        manager.loadDefinitions();
-
-        Bukkit.getPluginManager().registerEvents(this, this);
-
         if (!FancyHologramsPlugin.isEnabled()) {
             getLogger().severe("FancyHolograms no está habilitado. VHolograms se desactivará.");
             Bukkit.getPluginManager().disablePlugin(this);
             return;
         }
 
+        store = new MetadataStore(this);
+        store.load();
+
+        manager = new AdvancedHologramManager(this, store);
+        FancyCommandBridge commandBridge = new FancyCommandBridge(this, store, manager);
+
+        Bukkit.getPluginManager().registerEvents(manager, this);
+        Bukkit.getPluginManager().registerEvents(commandBridge, this);
+
         if (FancyHologramsPlugin.get().getHologramManager().isLoaded()) {
             Bukkit.getScheduler().runTask(this, manager::rebuildAll);
         }
 
-        getLogger().info("VHolograms 0.1.0 habilitado.");
+        getLogger().info("VHolograms 0.2.0 habilitado.");
+    }
+
+    @Override
+    public void onDisable() {
+        if (manager != null && FancyHologramsPlugin.isEnabled()) {
+            manager.destroyAll(true);
+        }
     }
 
     private void migrateLegacyDataFolder() {
         File newFolder = getDataFolder();
         File pluginsFolder = newFolder.getParentFile();
 
-        if (newFolder.exists() || pluginsFolder == null) {
-            return;
-        }
+        if (newFolder.exists() || pluginsFolder == null) return;
 
         File legacyFolder = new File(pluginsFolder, "VahmurHolograms");
-        if (!legacyFolder.isDirectory()) {
-            return;
-        }
+        if (!legacyFolder.isDirectory()) return;
 
         try {
             Files.move(legacyFolder.toPath(), newFolder.toPath());
             getLogger().info("Configuración migrada de VahmurHolograms a VHolograms.");
         } catch (IOException exception) {
             getLogger().warning("No se pudo migrar automáticamente la carpeta VahmurHolograms: " + exception.getMessage());
-        }
-    }
-
-    @Override
-    public void onDisable() {
-        if (manager != null) manager.destroyAll();
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onHologramsLoaded(HologramsLoadedEvent event) {
-        Bukkit.getScheduler().runTask(this, manager::rebuildAll);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onHologramsUnloaded(HologramsUnloadedEvent event) {
-        manager.destroyAll();
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onShow(HologramShowEvent event) {
-        String anchor = event.getHologram().getName();
-        if (manager.isConfiguredAnchor(anchor)) {
-            manager.showForAnchor(anchor, event.getPlayer());
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onHide(HologramHideEvent event) {
-        String anchor = event.getHologram().getName();
-        if (manager.isConfiguredAnchor(anchor)) {
-            manager.hideForAnchor(anchor, event.getPlayer());
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onUpdate(HologramUpdateEvent event) {
-        String anchor = event.getHologram().getName();
-        if (manager.isConfiguredAnchor(anchor)) {
-            Bukkit.getScheduler().runTask(this, () -> manager.rebuildAnchor(anchor));
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onCreate(HologramCreateEvent event) {
-        String anchor = event.getHologram().getName();
-        if (manager.isConfiguredAnchor(anchor)) {
-            Bukkit.getScheduler().runTask(this, () -> manager.rebuildAnchor(anchor));
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onDelete(HologramDeleteEvent event) {
-        String anchor = event.getHologram().getName();
-        if (manager.isConfiguredAnchor(anchor)) {
-            manager.destroyAnchor(anchor);
         }
     }
 
@@ -130,45 +73,67 @@ public final class VHologramsPlugin extends JavaPlugin implements Listener {
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§6VHolograms §7- §f/vholo <reload|status|rebuild [id]>");
+            sender.sendMessage("§6VHolograms §7- §f/vholo <reload|status|rebuild|clear>");
             return true;
         }
 
         switch (args[0].toLowerCase()) {
             case "reload" -> {
-                manager.destroyAll();
+                manager.destroyAll(true);
                 reloadConfig();
-                manager.loadDefinitions();
+                store.load();
                 manager.rebuildAll();
                 sender.sendMessage("§aVHolograms recargado.");
                 return true;
             }
             case "status" -> {
                 sender.sendMessage("§6VHolograms §7- §fEstado");
-                sender.sendMessage("§7Configurados: §f" + manager.configuredCount());
-                sender.sendMessage("§7Habilitados: §f" + manager.enabledCount());
-                sender.sendMessage("§7Activos: §f" + manager.activeCount());
+                sender.sendMessage("§7Hologramas con estilos: §f" + store.all().size());
+                sender.sendMessage("§7Grupos activos: §f" + manager.activeCount());
                 return true;
             }
             case "rebuild" -> {
                 if (args.length == 1) {
                     manager.rebuildAll();
-                    sender.sendMessage("§aTodos los hologramas avanzados fueron reconstruidos.");
+                    sender.sendMessage("§aTodos los hologramas de VHolograms fueron reconstruidos.");
+                } else {
+                    manager.rebuild(args[1]);
+                    sender.sendMessage("§aHolograma '" + args[1] + "' reconstruido.");
+                }
+                return true;
+            }
+            case "clear" -> {
+                if (args.length < 2) {
+                    sender.sendMessage("§cUso: /vholo clear <holograma> [línea]");
                     return true;
                 }
 
-                String anchor = manager.anchorForId(args[1]);
-                if (anchor == null) {
-                    sender.sendMessage("§cNo existe un grupo con id '" + args[1] + "'.");
+                String hologram = args[1];
+                boolean changed;
+                if (args.length >= 3) {
+                    int line;
+                    try {
+                        line = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException exception) {
+                        sender.sendMessage("§cLa línea debe ser un número.");
+                        return true;
+                    }
+                    changed = store.clearLine(hologram, line);
+                } else {
+                    changed = store.clearHologram(hologram);
+                }
+
+                if (!changed) {
+                    sender.sendMessage("§eNo había estilos de VHolograms para limpiar.");
                     return true;
                 }
 
-                manager.rebuildAnchor(anchor);
-                sender.sendMessage("§aGrupo '" + args[1] + "' reconstruido.");
+                manager.scheduleRebuild(hologram);
+                sender.sendMessage("§aEstilos de VHolograms eliminados. FancyHolograms vuelve a mostrar el texto original.");
                 return true;
             }
             default -> {
-                sender.sendMessage("§cSubcomando desconocido. Usa /vholo <reload|status|rebuild [id]>.");
+                sender.sendMessage("§cSubcomando desconocido. Usa /vholo <reload|status|rebuild|clear>.");
                 return true;
             }
         }
