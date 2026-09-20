@@ -1,8 +1,9 @@
 name: VHolograms
-version: 0.2.3
+version: 0.2.4
 main: net.vahmur.holograms.VHologramsPlugin
 api-version: '1.21'
-author: Vahmur
+author: SMHenrry
+description: Extensión de FancyHolograms desarrollada para Vahmur Network.
 
 depend:
   - FancyHolograms
@@ -12,7 +13,7 @@ softdepend:
 commands:
   vholo:
     description: Administra las extensiones por línea de VHolograms.
-    usage: /vholo <reload|status|rebuild|clear>
+    usage: /vholo <info|version|reload|status|rebuild|clear>
     aliases: [vholograms]
     permission: vholograms.admin
 

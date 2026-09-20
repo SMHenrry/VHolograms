@@ -7,6 +7,9 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class VHologramsPlugin extends JavaPlugin {
+    private static final String CREATOR = "SMHenrry";
+    private static final String PROJECT = "Vahmur Network";
+
     private MetadataStore store;
     private AdvancedHologramManager manager;
 
@@ -33,7 +36,7 @@ public final class VHologramsPlugin extends JavaPlugin {
             Bukkit.getScheduler().runTask(this, manager::rebuildAll);
         }
 
-        getLogger().info("VHolograms " + getPluginMeta().getVersion() + " habilitado.");
+        sendStartupBanner();
     }
 
     @Override
@@ -54,11 +57,16 @@ public final class VHologramsPlugin extends JavaPlugin {
         }
 
         if (args.length == 0) {
-            sender.sendMessage("§6VHolograms §7- §f/vholo <reload|status|rebuild|clear>");
+            sender.sendMessage("§6§lVHolograms §7v§f" + getPluginMeta().getVersion());
+            sender.sendMessage("§7Usa §f/vholo <info|version|reload|status|rebuild|clear>");
             return true;
         }
 
         switch (args[0].toLowerCase()) {
+            case "info", "version" -> {
+                sendPluginInfo(sender);
+                return true;
+            }
             case "reload" -> {
                 manager.destroyAll(true);
                 reloadConfig();
@@ -114,9 +122,23 @@ public final class VHologramsPlugin extends JavaPlugin {
                 return true;
             }
             default -> {
-                sender.sendMessage("§cSubcomando desconocido. Usa /vholo <reload|status|rebuild|clear>.");
+                sender.sendMessage("§cSubcomando desconocido. Usa /vholo <info|version|reload|status|rebuild|clear>.");
                 return true;
             }
         }
+    }
+
+    private void sendStartupBanner() {
+        CommandSender console = Bukkit.getConsoleSender();
+        console.sendMessage("§8┌─ §6§lVHolograms §7v§f" + getPluginMeta().getVersion());
+        console.sendMessage("§8│ §7Creado por §f" + CREATOR + " §8• §7Para §f" + PROJECT);
+        console.sendMessage("§8└─ §aHabilitado correctamente");
+    }
+
+    private void sendPluginInfo(CommandSender sender) {
+        sender.sendMessage("§8┌─ §6§lVHolograms §7v§f" + getPluginMeta().getVersion());
+        sender.sendMessage("§8│ §7Extensión por línea para §fFancyHolograms");
+        sender.sendMessage("§8│ §7Creador: §f" + CREATOR);
+        sender.sendMessage("§8└─ §7Desarrollado para §f" + PROJECT);
     }
 }

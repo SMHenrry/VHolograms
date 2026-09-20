@@ -2,6 +2,8 @@
 
 **VHolograms** es un add-on para [FancyHolograms](https://github.com/FancyInnovations/FancyPlugins) que permite dar propiedades independientes a cada línea de un holograma de texto sin abandonar el flujo normal de FancyHolograms.
 
+Creado por **SMHenrry** para **Vahmur Network**.
+
 La idea principal es simple:
 
 - **FancyHolograms sigue siendo la fuente de verdad.**
@@ -212,6 +214,8 @@ VHolograms no reemplaza ni interpreta el glyph: conserva el texto y deja que el 
 ## Comandos de VHolograms
 
 ```text
+/vholo info
+/vholo version
 /vholo status
 /vholo reload
 /vholo rebuild
@@ -219,6 +223,8 @@ VHolograms no reemplaza ni interpreta el glyph: conserva el texto y deja que el 
 /vholo clear <holograma>
 /vholo clear <holograma> <línea>
 ```
+
+`/vholo info` y `/vholo version` muestran la versión actual, el creador y el proyecto para el que fue desarrollado VHolograms.
 
 Permiso:
 
