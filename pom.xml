@@ -6,7 +6,7 @@
 
     <groupId>net.vahmur</groupId>
     <artifactId>VHolograms</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -42,7 +42,7 @@
     </dependencies>
 
     <build>
-        <finalName>VHolograms-0.1.0</finalName>
+        <finalName>VHolograms-0.2.0</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
