@@ -2,8 +2,6 @@ package net.vahmur.holograms;
 
 import org.bukkit.configuration.ConfigurationSection;
 
-import java.util.Map;
-
 final class LineStyle {
     private Float scaleX;
     private Float scaleY;
@@ -55,61 +53,10 @@ final class LineStyle {
         return style;
     }
 
-    static LineStyle fromLegacyMap(Map<?, ?> map) {
-        LineStyle style = new LineStyle();
-
-        if (map.containsKey("scale")) {
-            float scale = number(map.get("scale"), 1.0F);
-            style.scaleX = scale;
-            style.scaleY = scale;
-            style.scaleZ = scale;
-        }
-
-        if (map.containsKey("scale_x")) style.scaleX = number(map.get("scale_x"), 1.0F);
-        if (map.containsKey("scale_y")) style.scaleY = number(map.get("scale_y"), 1.0F);
-        if (map.containsKey("scale_z")) style.scaleZ = number(map.get("scale_z"), 1.0F);
-        if (map.containsKey("offset_x")) style.offsetX = number(map.get("offset_x"), 0.0F);
-        if (map.containsKey("offset_y")) style.offsetY = number(map.get("offset_y"), 0.0F);
-        if (map.containsKey("offset_z")) style.offsetZ = number(map.get("offset_z"), 0.0F);
-        if (map.containsKey("gap_before")) style.gapBefore = numberDouble(map.get("gap_before"), 0.0D);
-        if (map.containsKey("gap_after")) style.gapAfter = numberDouble(map.get("gap_after"), 0.0D);
-        if (map.containsKey("text_shadow")) style.textShadow = booleanValue(map.get("text_shadow"));
-        if (map.containsKey("see_through")) style.seeThrough = booleanValue(map.get("see_through"));
-
-        return style;
-    }
-
-    private static float number(Object value, float fallback) {
-        if (value instanceof Number number) return number.floatValue();
-        if (value == null) return fallback;
-        try {
-            return Float.parseFloat(String.valueOf(value));
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    private static double numberDouble(Object value, double fallback) {
-        if (value instanceof Number number) return number.doubleValue();
-        if (value == null) return fallback;
-        try {
-            return Double.parseDouble(String.valueOf(value));
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    private static Boolean booleanValue(Object value) {
-        if (value instanceof Boolean bool) return bool;
-        if (value == null) return null;
-        if (String.valueOf(value).equalsIgnoreCase("true")) return true;
-        if (String.valueOf(value).equalsIgnoreCase("false")) return false;
-        return null;
-    }
-
     void write(ConfigurationSection section) {
         if (scaleX != null && scaleY != null && scaleZ != null
-                && Float.compare(scaleX, scaleY) == 0 && Float.compare(scaleY, scaleZ) == 0) {
+                && Float.compare(scaleX, scaleY) == 0
+                && Float.compare(scaleY, scaleZ) == 0) {
             section.set("scale", scaleX);
         } else {
             if (scaleX != null) section.set("scale_x", scaleX);
