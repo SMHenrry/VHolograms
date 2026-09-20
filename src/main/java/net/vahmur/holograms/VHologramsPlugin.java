@@ -39,7 +39,10 @@ public final class VHologramsPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (manager != null && FancyHologramsPlugin.isEnabled()) {
-            manager.destroyAll(true);
+            // During a full server shutdown there is no reason to briefly restore
+            // FancyHolograms' original parent display: clients are about to leave.
+            // A normal plugin disable still restores the parent as before.
+            manager.destroyAll(!Bukkit.isStopping());
         }
     }
 
