@@ -7,7 +7,7 @@ La idea principal es simple:
 - **FancyHolograms sigue siendo la fuente de verdad.**
 - El texto y las propiedades generales continúan guardándose en FancyHolograms.
 - VHolograms solo guarda la metadata adicional que Fancy no puede aplicar de forma independiente a cada línea.
-- No es necesario editar `holograms.yml` ni reemplazar el texto por `<reset>`.
+- No necesitas editar `holograms.yml` ni reemplazar el texto por `<reset>`.
 
 ## Requisitos
 
@@ -21,9 +21,10 @@ Los glyphs de Nexo pueden seguir utilizándose normalmente dentro del texto de F
 ## Instalación
 
 1. Instala FancyHolograms.
-2. Coloca `VHolograms-0.2.0.jar` dentro de `plugins/`.
-3. Reinicia el servidor.
-4. Crea y edita tus hologramas con FancyHolograms como siempre.
+2. Descarga el JAR de la release más reciente de VHolograms.
+3. Colócalo dentro de `plugins/`.
+4. Reinicia el servidor.
+5. Crea y edita tus hologramas con FancyHolograms como siempre.
 
 VHolograms genera:
 
@@ -276,27 +277,7 @@ El coste visual aumenta con la cantidad de líneas avanzadas visibles porque cad
 
 FancyHolograms maneja `TEXT`, `ITEM` y `BLOCK` como tipos de holograma distintos.
 
-La versión 0.2.0 de VHolograms extiende únicamente hologramas `TEXT`. No mezcla `ITEM` o `BLOCK` dentro del mismo holograma lógico.
-
-## Migración desde 0.1.0
-
-VHolograms 0.1.0 requería utilizar un anchor con:
-
-```yaml
-text:
-- '<reset>'
-```
-
-y almacenaba el texto dentro de su propia configuración.
-
-La 0.2.0 migra automáticamente ese formato:
-
-- detecta la configuración anterior;
-- restaura el texto dentro de FancyHolograms cuando el anchor estaba vacío;
-- conserva la metadata de escala, offsets, gaps y overrides;
-- mueve la carpeta antigua `plugins/VahmurHolograms/` a `plugins/VHolograms/` cuando corresponde.
-
-Una vez migrado, el texto vuelve a pertenecer a FancyHolograms.
+VHolograms actualmente extiende únicamente hologramas `TEXT`. No mezcla `ITEM` o `BLOCK` dentro del mismo holograma lógico.
 
 ## Ejemplo completo
 
@@ -314,15 +295,3 @@ Una vez migrado, el texto vuelve a pertenecer a FancyHolograms.
 ```
 
 El resultado sigue siendo administrable desde FancyHolograms, pero cada línea puede tener su propia escala y separación gracias a VHolograms.
-
-## Versionado y desarrollo
-
-La rama `main` representa las versiones estables.
-
-Antes de cambios grandes se conservan puntos de restauración en ramas estables. La versión previa a esta arquitectura permanece disponible en:
-
-```text
-stable/v0.1.0-before-native-workflow
-```
-
-Las nuevas implementaciones se desarrollan y prueban en ramas separadas antes de fusionarse a `main`.
